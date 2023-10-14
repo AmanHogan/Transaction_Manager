@@ -3,7 +3,6 @@
  * UTAID - 1001830469
  * Instructor: Professor Ashraf Aboulnaga
  * Section: 2238-CSE-5331-002-DBMS MODELS AND IMPLEMENTATION
- * 
 */
 
 /* the Tx mgr functions are implemented here */
