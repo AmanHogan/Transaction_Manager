@@ -118,28 +118,56 @@ void *process_read_write(long tid, long obno,  int count, char mode)
 
 /**
  * @brief aborts transaction
- * @param arg
+ * @param arg structure containing information about transaction
  * @returns None
 */
 void *aborttx(void *arg)
 {
-  struct param *node = (struct param*)arg; 
-  //TODO: write your code
-  pthread_exit(NULL);			
+	struct param *node = (struct param*)arg; // get tid and count  
+	
+	start_operation(node->tid, node->count);
+	zgt_p(0);
+
+	// Transaction pointer
+	zgt_tx *txptr = get_tx(node->tid);
+	
+	//  TR_ABORT (represented as “A”)
+	txptr->status = 'A';  
+
+	do_commit_abort(node->tid,txptr->status); 
+	zgt_v(0);  
+
+	finish_operation(node->tid);
+	pthread_exit(NULL);
+
+	//TODO: write your code
 }
 
 /**
  * @brief commits transaction
- * @param arg
+ * @param arg structure containing information about transaction
  * @returns None
 */
 void *committx(void *arg)
 {
-	//remove the locks/objects before committing
 	// get tid and count
 	struct param *node = (struct param*)arg;
 
-	//TODO: write your code
+	start_operation(node->tid, node->count);
+	zgt_p(0);       
+	
+	// Transaction pointer
+	zgt_tx *txptr = get_tx(node->tid);
+	
+	// TR_END (represented as “E”). This is the state while commit is going on.
+	txptr->status = 'E';  
+	do_commit_abort(node->tid, txptr->status);
+	
+	zgt_v(0);
+
+	finish_operation(node->tid);
+
+	// TODO: write your code
 	pthread_exit(NULL);
 }
 
@@ -294,7 +322,7 @@ int zgt_tx::set_lock(long tid1, long sgno1, long obno1, int count, char lockmode
 
 	zgt_p(0); // set lock
 		zgt_hlink *hash_txptr = ZGT_Ht->find(sgno1, obno1); // Pointer to transaction on hashtable
-	zgt_p(0); // free lock
+	zgt_v(0); // free lock
 
 	// If there was not a transaction in the hashtable, add it to the hashtable
 	if (hash_txptr == NULL)
