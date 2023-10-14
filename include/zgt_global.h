@@ -18,13 +18,13 @@
 #include<stddef.h>
 #define READWRITE 0
 
-int ZGT_Nsema;
+int ZGT_Nsema; // ZGT_Nsema -- total number of semaphores 
 int errno;
 key_t  ZGT_Key_sem;
 int  ZGT_Semid;
 
-zgt_ht * ZGT_Ht;
-zgt_tm * ZGT_Sh;
+zgt_ht * ZGT_Ht; // ZGT_Ht -- hash table data structure
+zgt_tm * ZGT_Sh; // ZGT_Sh  -- main tx manager data structure
 zgt_tx * ZGT_Tx;
 int  ZGT_Initp;
 int Zgt_errno=0;

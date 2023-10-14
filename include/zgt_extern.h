@@ -42,6 +42,9 @@ extern int system(char *);
 extern int ZGT_Initp;
 extern int Zgt_errno;
 
+/**
+ * @brief structure that holds tid, obno, count, and Txtype
+*/
 struct param
 {
   long tid, obno, count;

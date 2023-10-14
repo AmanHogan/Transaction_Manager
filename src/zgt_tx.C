@@ -31,45 +31,7 @@ extern void *process_read_write(long, long, int, char);
 extern zgt_tm *ZGT_Sh;	
 
 
-/**
- * @brief Transaction class constructor. Initializes transaction id, status, and thread id.
- * @param tid Transaction id (Ex: Tx1, Tx2, etc)
- * @param Txstatus Status of Transaction, eg. if the Tx is wating or not
- * @param type Type of Transaction, e.g Read or Write
- * @param thrid Unique thread id
- * @returns None
-*/
-zgt_tx::zgt_tx( long tid, char Txstatus,char type, pthread_t thrid)
-{
-	this->lockmode = (char)' ';  // default
-	this->Txtype = type; //Fall 2016[jay] R = read only, W=Read or Write
-	this->sgno =1;
-	this->tid = tid;
-	this->obno = -1; //set it to a invalid value
-	this->status = Txstatus;
-	this->pid = thrid;
-	this->head = NULL;
-	this->nextr = NULL;
-	this->semno = -1; //init to  an invalid sem value
-}
 
-/* Method used to obtain reference to a transaction node      */
-/* Inputs the transaction id. Makes a linear scan over the    */
-/* linked list of transaction nodes and returns the reference */
-/* of the required node if found. Otherwise returns NULL      */
-
-zgt_tx* get_tx(long tid1){  
-  zgt_tx *txptr, *lastr1;
-  
-  if(ZGT_Sh->lastr != NULL){	// If the list is NOT empty
-      lastr1 = ZGT_Sh->lastr;	// Initialize lastr1 to first node's ptr
-      for  (txptr = lastr1; (txptr != NULL); txptr = txptr->nextr)
-	    if (txptr->tid == tid1) 		// if required id is found									
-	       return txptr; 
-      return (NULL);			// if not found in list return NULL
-   }
-  return(NULL);				// if list is empty return NULL
-}
 
 /* Method that handles "BeginTx tid" in test file     */
 /* Inputs a pointer to transaction id, obj pair as a struct. Creates a new  */
@@ -107,11 +69,23 @@ void *begintx(void *arg){
 /* or same tx holds a lock on it. Otherwise waits */
 /* until the lock is released */
 
-void *readtx(void *arg){
-  struct param *node = (struct param*)arg;// get tid and objno and count
+void *readtx(void *arg)
+{
+	// Structure that holds tid, obno, count, and Txtyp
+	struct param *node = (struct param*) arg;
 
-  //do the operations for reading. Write YOUR code
-  return(0);
+	// Begin Operation
+	start_operation(node->tid, node->count);
+
+	// Pointer to current transaction
+	zgt_tx* txptr = get_tx(node->tid); 
+
+	txptr->set_lock(node->tid, 1, node->obno, node->count, 'R');
+
+	finish_operation(node->tid);
+
+	pthread_exit(NULL);
+	
 }
 
 
@@ -161,37 +135,176 @@ void *do_commit_abort(long t, char status){
   return(0);
 }
 
-int zgt_tx::remove_tx ()
+
+/**
+ * @brief Transaction class constructor. Initializes transaction id, status, and thread id.
+ * @param tid Transaction id (Ex: Tx1, Tx2, etc)
+ * @param Txstatus Status: P for Processing, W for Wiat, A for Abort, E for commit in progress
+ * @param type Type of Transaction, e.g Read or Write
+ * @param thrid Unique thread id
+ * @returns None
+*/
+zgt_tx::zgt_tx( long tid, char Txstatus,char type, pthread_t thrid)
 {
-  //remove the transaction from the TM
-  
-  zgt_tx *txptr, *lastr1;
-  lastr1 = ZGT_Sh->lastr;
-  for(txptr = ZGT_Sh->lastr; txptr != NULL; txptr = txptr->nextr){	// scan through list
-	  if (txptr->tid == this->tid){		// if correct node is found          
-		 lastr1->nextr = txptr->nextr;	// update nextr value; done
-		 //delete this;
-         return(0);
-	  }
-	  else lastr1 = txptr->nextr;			// else update prev value
-   }
-  fprintf(ZGT_Sh->logfile, "Trying to Remove a Tx:%ld that does not exist\n", this->tid);
-  fflush(ZGT_Sh->logfile);
-  printf("Trying to Remove a Tx:%ld that does not exist\n", this->tid);
-  fflush(stdout);
-  return(-1);
+	this->lockmode = (char)' '; 
+	this->Txtype = type; 
+	this->sgno = 1;
+	this->tid = tid;
+	this->obno = -1; // Always 1
+	this->status = Txstatus; // Status: P for Processing, W for Wiat, A for Abort, E for commit in progress
+	this->pid = thrid;
+	this->head = NULL;
+	this->nextr = NULL;
+	this->semno = -1;
 }
 
-/* this method sets lock on objno1 with lockmode1 for a tx*/
+/* Method used to obtain reference to a transaction node      */
+/* Inputs the transaction id. Makes a linear scan over the    */
+/* linked list of transaction nodes and returns the reference */
+/* of the required node if found. Otherwise returns NULL      */
 
-int zgt_tx::set_lock(long tid1, long sgno1, long obno1, int count, char lockmode1){
-  //if the thread has to wait, block the thread on a semaphore from the
-  //sempool in the transaction manager. Set the appropriate parameters in the
-  //transaction list if waiting.
-  //if successful  return(0); else -1
+zgt_tx* get_tx(long tid1){  
+  zgt_tx *txptr, *lastr1;
   
-    //write your code
-  return(0);
+  if(ZGT_Sh->lastr != NULL){	// If the list is NOT empty
+      lastr1 = ZGT_Sh->lastr;	// Initialize lastr1 to first node's ptr
+      for  (txptr = lastr1; (txptr != NULL); txptr = txptr->nextr)
+	    if (txptr->tid == tid1) 		// if required id is found									
+	       return txptr; 
+      return (NULL);			// if not found in list return NULL
+   }
+  return(NULL);				// if list is empty return NULL
+}
+
+
+/**
+ * @brief Removes the transaction from the transaction manager
+ * @param None
+ * @returns None
+*/
+int zgt_tx::remove_tx ()
+{
+	// Temporary pointer
+	zgt_tx *txptr;
+
+	// Pointer to the last transaction in the transaction list
+	zgt_tx *lastr1;
+	lastr1 = ZGT_Sh->lastr;
+
+	// Sacn through list of transactions, starting from the last transaction
+	for(txptr = ZGT_Sh->lastr; txptr != NULL; txptr = txptr->nextr)
+	{	
+		// If the TID mathces the Tx to be removed, remove it from the list
+		if (txptr->tid == this->tid)
+		{	
+			lastr1->nextr = txptr->nextr;	
+			return(0);
+		}
+
+		// Update temporary pointer
+		else
+		{
+			lastr1 = txptr->nextr;
+		} 			
+	}
+
+	fprintf(ZGT_Sh->logfile, "Trying to Remove a Tx:%ld that does not exist\n", this->tid);
+	fflush(ZGT_Sh->logfile);
+	printf("Trying to Remove a Tx:%ld that does not exist\n", this->tid);
+	fflush(stdout);
+	return(-1);
+}
+
+/**
+ * @brief sets lock on objno1 with lockmode1 for a tx
+ * @param tid1 Transaction ID
+ * @param sgno1 The number: 1
+ * @param obno1 Object number
+ * @param count Current operation number (compared with the condset[tid] value to decide whether to wait)
+ * @param lockmode1 S for shared lock, X for exclusive lock
+ * @return2 0 for succes, -1 for failure
+*/
+int zgt_tx::set_lock(long tid1, long sgno1, long obno1, int count, char lockmode1)
+{
+	//if the thread has to wait, block the thread on a semaphore from the
+	//sempool in the transaction manager. Set the appropriate parameters in the
+	//transaction list if waiting.
+	//if successful  return(0); else -1
+	//write your code
+	
+	// Current transaction
+	zgt_tx *txptr = get_tx(tid1);
+
+	zgt_p(0); // set lock
+		zgt_hlink *hash_txptr = ZGT_Ht->find(sgno1, obno1); // Pointer to transaction on hashtable
+	zgt_p(0); // free lock
+
+	// If there was not a transaction in the hashtable, add it to the hashtable
+	if (hash_txptr == NULL)
+	{
+		zgt_p(0); // set lock
+			ZGT_Ht->add(txptr,sgno1, obno1, lockmode1);
+		zgt_v(0); // free lock
+
+		// Perform operation
+		txptr->perform_readWrite(tid1, obno1, lockmode1);
+	}
+
+	// Else if the transaction was found inside the hash table
+	else if (hash_txptr->tid == txptr->tid)
+	{
+		// Perform operation
+		txptr->perform_readWrite(tid1, obno1, lockmode1);
+	}
+
+	// NOTE: This condition kept occuring for me when trancations were wating on other transactions
+	// Else if the transaction cannot proceed
+	else
+	{
+		// Check if an object is being held by a transaction
+		zgt_p(0); // set lock
+			zgt_hlink *zgt_obj_held = ZGT_Ht->findt(tid1, sgno1, obno1); // Object held by transaction
+		zgt_v(0); // free lock
+
+		// If an object is being held by a transaction, perform operation
+		if(zgt_obj_held != NULL)
+		{
+			txptr->perform_readWrite(tid1, obno1, lockmode1);
+		}
+
+		// If no object is being held by a transaction
+		else
+		{
+			// Get number of transactions waiting on semphaore to realease the other transactions waiting on it
+			int zgt_wait = zgt_nwait(hash_txptr->tid);
+
+			// Exclusive Lock
+			if((lockmode1 == 'R' && hash_txptr->lockmode == 'W' ) || (lockmode1 == 'R' && hash_txptr->lockmode == 'R' && zgt_wait > 0) || (lockmode1 == 'W'))
+			{
+				txptr->status = TR_WAIT;
+				txptr->obno = obno1;
+				txptr->lockmode = lockmode1;
+				
+				// Set the number of semaphores
+				txptr->setTx_semno(hash_txptr->tid,hash_txptr->tid);
+				zgt_p(hash_txptr->tid); // Set lock
+					txptr->lockmode = ' ';
+					txptr->obno = -1;
+					txptr->status = TR_ACTIVE;
+					txptr->perform_readWrite(tid1, obno1, lockmode1);
+				zgt_v(hash_txptr->tid); // Free lock
+			}
+
+			// Shared Lock
+			else
+			{
+				// Perform operation
+				txptr->perform_readWrite(tid1, obno1, lockmode1);
+			}
+		}
+	}
+	
+	return(0);
 }
 
 int zgt_tx::free_locks()
@@ -310,15 +423,32 @@ void zgt_tx::print_lock(){
 // routine to perform the acutual read/write operation
 // based  on the lockmode
 
-void zgt_tx::perform_readWrite(long tid,long obno, char lockmode){
-  
+void zgt_tx::perform_readWrite(long tid, long obno, char lockmode){
   //write your code
+  int values = ZGT_Sh->objarray[obno]->value;
+
+  // If the lockmode if showing WriteTx
+  if(lockmode == 'W')   
+  {
+    ZGT_Sh->objarray[obno]->value=values + 1;  
+		//logging to file
+		
+    fprintf(ZGT_Sh->logfile, "Transaction : %ld\t\t\ttWriteTx\t\t\t%ld:%d:%d\t\t\tWriteLock\t\t\tGranted\t\t\t %c\n", this->tid, obno, ZGT_Sh->objarray[obno]->value, ZGT_Sh->optime[tid], this->status);
+    fflush(ZGT_Sh->logfile);
+  }
+  else  
+  {
+    ZGT_Sh->objarray[obno]->value=values - 1;  
+	  fprintf(ZGT_Sh->logfile, "Transaction : %ld\t\t\t ReadTx\t\t\t %ld:%d:%d \t\t\t ReadLock\t\t\t Granted\t\t\t %c\n", this->tid, obno, ZGT_Sh->objarray[obno]->value, ZGT_Sh->optime[tid], this->status);
+    fflush(ZGT_Sh->logfile);
+  }
 
 }
 
 // routine that sets the semno in the Tx when another tx waits on it.
 // the same number is the same as the tx number on which a Tx is waiting
-int zgt_tx::setTx_semno(long tid, int semno){
+int zgt_tx::setTx_semno(long tid, int semno)
+{
   zgt_tx *txptr;
   
   txptr = get_tx(tid);

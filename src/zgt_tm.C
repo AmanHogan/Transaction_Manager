@@ -7,7 +7,6 @@
 */
 
 /* the Tx mgr functions are implemented here */
-
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -64,7 +63,7 @@ void zgt_tm::openlog(string lfile)
 }
 
 /**
- * @brief Creates a thread and calls the constructor of the Transaction class
+ * @desc Creates a thread and calls the constructor of the Transaction class
  * Creates object and initializes the other members of the Transaction class using the
  * function begintx(void *thdarg). To pass arguments, you pass in the thread args as a struct.
  * @param tid Transaction id (Ex: Tx1, Tx2, etc)
@@ -104,16 +103,19 @@ int zgt_tm::BeginTx(long tid, int thrNum, char type)
    return(0);
 }     
 
+/**
+ * @desc Sets tx manager semphaore, creates a thread and checks if the thread 
+ * can proceed based on the consdition (Prevents 2 operations from the same tx follow one another).
+ * Then gets lock to perform a read operation (Prints value)
+ * Then Write operation increments value by one.
+ * Creates theread and calls readtx(void *)
+ * @param tid Transaction id (Ex: Tx1, Tx2, etc)
+ * @param thrNum Unique thread id
+ * @param obno Unique object number
+ * 
+*/
 int zgt_tm::TxRead(long tid, long obno, int thrNum)
 {
-   //again set the txmgr semaphore first. create a thread and first check 
-   // whether this thread can proceed based on the condition variable for that thread.
-   // This is to prevent 2 operations of the same Tx follow one another.
-   // Then get the lock and perform the read opeartion.
-   //  Call the read function in transaction. Read operation is just printing the value of the item; write operation is
-   //to increement the value by 1.
-   //now create the thread and call the method readtx(void *)
-
    #ifdef TM_DEBUG
       printf("\ncreating TxRead thread for Tx: %ld\n", tid);fflush(stdout);
       fflush(stdout); 
@@ -145,24 +147,22 @@ int zgt_tm::TxRead(long tid, long obno, int thrNum)
 
 int zgt_tm::TxWrite(long tid, long obno, int thrNum)
 {
-   //call the write function (writetx); same as above
-   // write your code
-   return(0);  // successful operation
+   // TODO: write your code
+   return(0);
 }
 
 int zgt_tm::CommitTx(long tid, int thrNum)
 {
-   //write your code
+   // TODO: write your code
    return(0); 
 }
  
 int zgt_tm::AbortTx(long tid, int thrNum)
  {       
-    //write your code
+   // TODO: write your code
    return(0);  
  }
 
-//used in version given_v2; called when end all is read from input
 int zgt_tm::endTm(int thrNum)
 {
    int rc=0;
@@ -214,7 +214,6 @@ int zgt_tm::endTm(int thrNum)
 //output  and log. In order to do that, spawn a thread that acquires the tm lock and 
 //constructs the wait for graph. You can use the data structure given in ddlock.h or 
 //modify it suitably 
-
 int zgt_tm::ddlockDet()
 {       
    #ifdef TM_DEBUG
