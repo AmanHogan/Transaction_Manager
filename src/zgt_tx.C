@@ -102,10 +102,19 @@ void *readtx(void *arg)
 */
 void *writetx(void *arg)
 { 
-	//do the operations for writing; similar to readTx
-  	struct param *node = (struct param*)arg;	// struct parameter that contains
-  	//do the operations for writing; similar to readTx. Write your code
-  	return(0);
+	// Structure that holds tid, obno, count, and Txtyp
+	struct param *node = (struct param*) arg;
+
+	// Begin Operation
+	start_operation(node->tid, node->count);
+
+	// Pointer to current transaction
+	zgt_tx* txptr = get_tx(node->tid); 
+	txptr->set_lock(node->tid, 1, node->obno, node->count, 'W');
+
+	finish_operation(node->tid);
+
+	pthread_exit(NULL);
 }
 
 /**
@@ -139,8 +148,6 @@ void *aborttx(void *arg)
 
 	finish_operation(node->tid);
 	pthread_exit(NULL);
-
-	//TODO: write your code
 }
 
 /**
@@ -167,7 +174,6 @@ void *committx(void *arg)
 
 	finish_operation(node->tid);
 
-	// TODO: write your code
 	pthread_exit(NULL);
 }
 
@@ -179,7 +185,55 @@ void *committx(void *arg)
 */
 void *do_commit_abort(long t, char status)
 {
-	// TODO: write your code
+	zgt_tx *txptr = get_tx(t);
+	
+	if (NULL != txptr)
+	{
+
+		int semno = txptr->semno;
+
+		// Free locks
+		txptr->free_locks();
+		zgt_v(txptr->tid);
+
+		// Remove transaction from the transaction manager
+		txptr->end_tx();
+
+
+		// There are some transactions waiting on semaphore
+		if(semno > -1)
+		{	
+			// number of waiting transactions
+			int tx_count = zgt_nwait(semno);
+
+			// If the number of waiting transactions is greater thyan 0, free them all
+			if (tx_count > 0)
+			{
+				int index = 0;
+				for(index = 0; index <= tx_count; index++)
+				{
+					zgt_v(semno);
+				}
+			}
+		}
+
+		// AbortTx
+		if(status == 'A')
+		{
+			fflush(ZGT_Sh->logfile);
+			fprintf(ZGT_Sh->logfile, "T%ld\t\t\t\tAbortTx\t\t\t\n",t);
+      		fflush(ZGT_Sh->logfile);
+		}
+
+		// CommitTx
+		else
+		{
+			fflush(ZGT_Sh->logfile);
+			fprintf(ZGT_Sh->logfile, "T%ld\t\t\t\tCommitTx \t\n",t);
+      		fflush(ZGT_Sh->logfile);
+		}
+	}
+
 	return(0);
 }
 
@@ -190,7 +244,6 @@ void *do_commit_abort(long t, char status)
 */
 void *start_operation(long tid, long count)
 {
-
 	// Lock mutex[t] to make other
 	pthread_mutex_lock(&ZGT_Sh->mutexpool[tid]);
 	
@@ -539,16 +592,14 @@ void zgt_tx::print_lock()
 */
 void zgt_tx::perform_readWrite(long tid, long obno, char lockmode){
 
-	// TODO: Write your own code
 	int values = ZGT_Sh->objarray[obno]->value;
 
 	// TxId Txtype Operation ObId:Obvalue:optime LockType Status TxStatus
-
 	// WriteLock
 	if(lockmode == 'W')   
 	{
 		ZGT_Sh->objarray[obno]->value = values + 1;  
-		fprintf(ZGT_Sh->logfile, "Transaction : %ld\t\t\ttWriteTx\t\t\t%ld:%d:%d\t\t\tWriteLock\t\t\tGranted\t\t\t %c\n", this->tid, obno, ZGT_Sh->objarray[obno]->value, ZGT_Sh->optime[tid], this->status);
+		fprintf(ZGT_Sh->logfile, "T%ld\t\t\t\t\tWriteTx\t\t\t%ld:%d:%d\t\t\tWriteLock\t\t\tGranted\t\t\t %c\n", this->tid, obno, ZGT_Sh->objarray[obno]->value, ZGT_Sh->optime[tid], this->status);
 		fflush(ZGT_Sh->logfile);
 	}
 
@@ -556,7 +607,7 @@ void zgt_tx::perform_readWrite(long tid, long obno, char lockmode){
 	else  
 	{
 		ZGT_Sh->objarray[obno]->value=values - 1;
-		fprintf(ZGT_Sh->logfile, "Transaction : %ld\t\t\t ReadTx\t\t\t %ld:%d:%d \t\t\t ReadLock\t\t\t Granted\t\t\t %c\n", this->tid, obno, ZGT_Sh->objarray[obno]->value, ZGT_Sh->optime[tid], this->status);
+		fprintf(ZGT_Sh->logfile, "T%ld\t\t\t\t\tReadTx\t\t\t %ld:%d:%d \t\t\t ReadLock\t\t\t Granted\t\t\t %c\n", this->tid, obno, ZGT_Sh->objarray[obno]->value, ZGT_Sh->optime[tid], this->status);
 		fflush(ZGT_Sh->logfile);
 	}
 }
