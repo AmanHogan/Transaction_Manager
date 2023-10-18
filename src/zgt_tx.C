@@ -189,6 +189,21 @@ void *do_commit_abort(long t, char status)
 	
 	if (NULL != txptr)
 	{
+		// AbortTx
+		if(status == 'A')
+		{
+			fflush(ZGT_Sh->logfile);
+			fprintf(ZGT_Sh->logfile, "T%ld\tAbortTx\t",t);
+      		fflush(ZGT_Sh->logfile);
+		}
+
+		// CommitTx
+		else
+		{
+			fflush(ZGT_Sh->logfile);
+			fprintf(ZGT_Sh->logfile, "T%ld\tCommitTx \t",t);
+      		fflush(ZGT_Sh->logfile);
+		}
 
 		int semno = txptr->semno;
 
@@ -199,9 +214,13 @@ void *do_commit_abort(long t, char status)
 		// Remove transaction from the transaction manager
 		txptr->end_tx();
 
+		if (semno <= -1)
+		{
+
+		}
 
 		// There are some transactions waiting on semaphore
-		if(semno > -1)
+		else
 		{	
 			// number of waiting transactions
 			int tx_count = zgt_nwait(semno);
@@ -217,21 +236,7 @@ void *do_commit_abort(long t, char status)
 			}
 		}
 
-		// AbortTx
-		if(status == 'A')
-		{
-			fflush(ZGT_Sh->logfile);
-			fprintf(ZGT_Sh->logfile, "T%ld\t\t\t\tAbortTx\t\t\t\n",t);
-      		fflush(ZGT_Sh->logfile);
-		}
-
-		// CommitTx
-		else
-		{
-			fflush(ZGT_Sh->logfile);
-			fprintf(ZGT_Sh->logfile, "T%ld\t\t\t\tCommitTx \t\n",t);
-      		fflush(ZGT_Sh->logfile);
-		}
+		
 	}
 
 	return(0);
