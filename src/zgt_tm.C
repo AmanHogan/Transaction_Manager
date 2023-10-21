@@ -1,9 +1,11 @@
 /**
+ * Group #9
  * Implementor: Aman Hogan-Bailey
  * UTAID - 1001830469
  * Instructor: Professor Ashraf Aboulnaga
  * Section: 2238-CSE-5331-002-DBMS MODELS AND IMPLEMENTATION
 */
+
 
 /* the Tx mgr functions are implemented here */
 #include <stdio.h>
@@ -118,7 +120,6 @@ int zgt_tm::TxRead(long tid, long obno, int thrNum)
    #ifdef TM_DEBUG
       printf("\ncreating TxRead thread for Tx: %ld\n", tid);
       fflush(stdout);
-      fflush(stdout); 
    #endif
    
    pthread_t thread1;
@@ -150,10 +151,10 @@ int zgt_tm::TxWrite(long tid, long obno, int thrNum)
   #ifdef TM_DEBUG
       printf("\nCreating TxWrite thread for Tx: %ld\n", tid);
       fflush(stdout);
-      fflush(stdout); 
    #endif
    
    pthread_t thread1;
+
    struct param *nodeinfo = (struct param*)malloc(sizeof(struct param));
    nodeinfo->tid = tid;
    nodeinfo->obno = obno;
@@ -182,7 +183,6 @@ int zgt_tm::CommitTx(long tid, int thrNum)
    #ifdef TM_DEBUG
       printf("\nCreating Commit thread for Tx: %ld\n", tid);
       fflush(stdout);
-      fflush(stdout); 
    #endif
    
    pthread_t thread1;
@@ -202,7 +202,7 @@ int zgt_tm::CommitTx(long tid, int thrNum)
    }
 
    #ifdef TM_DEBUG
-      printf("\nExiting TxCommit thread create for Tx: %ld\n", tid);
+      printf("\nexiting TxCommit thread create for Tx: %ld\n", tid);
       fflush(stdout);
    #endif
 
@@ -214,7 +214,6 @@ int zgt_tm::AbortTx(long tid, int thrNum)
    #ifdef TM_DEBUG
       printf("\nCreating Abort thread for Tx: %ld\n", tid);
       fflush(stdout);
-      fflush(stdout); 
    #endif
    
    pthread_t thread1;
@@ -301,12 +300,6 @@ int zgt_tm::ddlockDet()
 
    pthread_t thread1;
    int  status;
-
-   //   status=pthread_create(&thread1, NULL,ddlockdet,(void*)NULL);	// Fork a thread and pass tid
-   //if (status){
-   //printf("ERROR: return code from pthread_create() is:%d\n", status);
-   //exit(-1);
-   //}
 
    #ifdef TM_DEBUG
       printf("\nleaving ddlockDet thread create\n");

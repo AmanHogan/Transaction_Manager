@@ -6,6 +6,7 @@
 /**********************************************************/
 
 /**
+ * Group #9
  * Implementor: Aman Hogan-Bailey
  * UTAID - 1001830469
  * Instructor: Professor Ashraf Aboulnaga
@@ -42,20 +43,12 @@ extern zgt_tm *ZGT_Sh;
  * Inputs a pointer to transaction id, obj pair as a struct.
  * Creates a new transaction node, initializes its data members and
  * adds it to transaction list
- * @param arg
- * @returns None
+ * @param arg - structure that hold node tid, count, etc...
+ * @returns void*
 */
-void *begintx(void *arg)
+void* begintx(void* arg)
 {
-	/**
-	 * NOTE: intialise a transaction object. Make sure it is 
-	 * done after acquiring the semaphore for the tm and making sure that 
-	 * the operation can proceed using the condition variable. when creating
-	 * the tx object, set the tx to TR_ACTIVE and obno to -1; there is no 
-	 * semno as yet as none is waiting on this tx.
-	*/
-
-	struct param *node = (struct param*)arg; // get tid and count
+	struct param* node = (struct param*)arg; // get tid and count
 	start_operation(node->tid, node->count); 
 	zgt_tx *tx = new zgt_tx(node->tid,TR_ACTIVE, node->Txtype, pthread_self());	// Create new tx node
 
@@ -75,37 +68,36 @@ void *begintx(void *arg)
  * tx id and object no to read. Reads the object if 
  * the object is not yet present in hash table or same tx holds a lock on it. 
  * Otherwise waits until the lock is released 
- * @param arg
- * @returns None
+ * @param arg - structure that hold node tid, count, etc...
+ * @returns void*
 */
 void *readtx(void *arg)
 {
 	// Structure that holds tid, obno, count, and Txtyp
-	struct param *node = (struct param*) arg;
-
 	// Begin Operation
+	struct param *node = (struct param*) arg;
 	start_operation(node->tid, node->count);
 
 	// Pointer to current transaction
 	zgt_tx* txptr = get_tx(node->tid); 
 	txptr->set_lock(node->tid, 1, node->obno, node->count, 'R');
 
+	//complete transaction and exit this current thread
 	finish_operation(node->tid);
-
 	pthread_exit(NULL);
+	return(0);
 }
 
 /**
  * @brief writes transaction
- * @param arg
- * @returns None
+ * @param arg - structure that hold node tid, count, etc...
+ * @returns void*
 */
 void *writetx(void *arg)
 { 
 	// Structure that holds tid, obno, count, and Txtyp
-	struct param *node = (struct param*) arg;
-
 	// Begin Operation
+	struct param *node = (struct param*) arg;
 	start_operation(node->tid, node->count);
 
 	// Pointer to current transaction
@@ -113,8 +105,8 @@ void *writetx(void *arg)
 	txptr->set_lock(node->tid, 1, node->obno, node->count, 'W');
 
 	finish_operation(node->tid);
-
 	pthread_exit(NULL);
+	return(0);
 }
 
 /**
@@ -127,33 +119,34 @@ void *process_read_write(long tid, long obno,  int count, char mode)
 
 /**
  * @brief aborts transaction
- * @param arg structure containing information about transaction
- * @returns None
+ * @param arg - structure that hold node tid, count, etc...
+ * @returns void*
 */
 void *aborttx(void *arg)
 {
 	struct param *node = (struct param*)arg; // get tid and count  
-	
 	start_operation(node->tid, node->count);
+
 	zgt_p(0);
 
-	// Transaction pointer
-	zgt_tx *txptr = get_tx(node->tid);
+		// Transaction pointer
+		zgt_tx *txptr = get_tx(node->tid);
+		
+		//  TR_ABORT (represented as “A”)
+		txptr->status = 'A';  
+		do_commit_abort(node->tid,txptr->status); 
 	
-	//  TR_ABORT (represented as “A”)
-	txptr->status = 'A';  
-
-	do_commit_abort(node->tid,txptr->status); 
 	zgt_v(0);  
 
 	finish_operation(node->tid);
 	pthread_exit(NULL);
+	return(0);
 }
 
 /**
  * @brief commits transaction
- * @param arg structure containing information about transaction
- * @returns None
+ * @param arg - structure that hold node tid, count, etc...
+ * @returns void*
 */
 void *committx(void *arg)
 {
@@ -161,20 +154,21 @@ void *committx(void *arg)
 	struct param *node = (struct param*)arg;
 
 	start_operation(node->tid, node->count);
+	
 	zgt_p(0);       
 	
-	// Transaction pointer
-	zgt_tx *txptr = get_tx(node->tid);
-	
-	// TR_END (represented as “E”). This is the state while commit is going on.
-	txptr->status = 'E';  
-	do_commit_abort(node->tid, txptr->status);
+		// Transaction pointer
+		zgt_tx *txptr = get_tx(node->tid);
+		
+		// TR_END (represented as “E”). This is the state while commit is going on.
+		txptr->status = 'E';  
+		do_commit_abort(node->tid, txptr->status);
 	
 	zgt_v(0);
 
 	finish_operation(node->tid);
-
 	pthread_exit(NULL);
+	return(0);
 }
 
 /**
@@ -185,8 +179,10 @@ void *committx(void *arg)
 */
 void *do_commit_abort(long t, char status)
 {
+	// Transaction pointer
 	zgt_tx *txptr = get_tx(t);
 	
+	// If the transaction is valid ...
 	if (NULL != txptr)
 	{
 		// AbortTx
@@ -216,7 +212,7 @@ void *do_commit_abort(long t, char status)
 
 		if (semno <= -1)
 		{
-
+			// Dont do anything
 		}
 
 		// There are some transactions waiting on semaphore
@@ -235,8 +231,6 @@ void *do_commit_abort(long t, char status)
 				}
 			}
 		}
-
-		
 	}
 
 	return(0);
@@ -265,7 +259,7 @@ void *start_operation(long tid, long count)
 /**
  * @brief Signals the conditional broadcast
  * @param tid Transaction ID
- * @returns None
+ * @returns void*
 */
 void *finish_operation(long tid)
 {
@@ -365,16 +359,10 @@ int zgt_tx::remove_tx ()
  * @param obno1 Object number
  * @param count Current operation number (compared with the condset[tid] value to decide whether to wait)
  * @param lockmode1 R for shared lock, W for exclusive lock
- * @return2 0 for succes, -1 for failure
+ * @returns 0 for succes, -1 for failure
 */
 int zgt_tx::set_lock(long tid1, long sgno1, long obno1, int count, char lockmode1)
 {
-	//if the thread has to wait, block the thread on a semaphore from the
-	//sempool in the transaction manager. Set the appropriate parameters in the
-	//transaction list if waiting.
-	//if successful  return(0); else -1
-	//write your code
-	
 	// Current transaction
 	zgt_tx *txptr = get_tx(tid1);
 
@@ -383,10 +371,10 @@ int zgt_tx::set_lock(long tid1, long sgno1, long obno1, int count, char lockmode
 	zgt_v(0); // free lock
 
 	// If there was not a transaction in the hashtable, add it to the hashtable
-	if (hash_txptr == NULL)
+	if (NULL == hash_txptr)
 	{
 		zgt_p(0); // set lock
-			ZGT_Ht->add(txptr,sgno1, obno1, lockmode1);
+			ZGT_Ht->add(txptr,sgno1, obno1, lockmode1); // add pointer to the table
 		zgt_v(0); // free lock
 
 		// Perform operation
@@ -597,21 +585,24 @@ void zgt_tx::print_lock()
 */
 void zgt_tx::perform_readWrite(long tid, long obno, char lockmode){
 
-	int values = ZGT_Sh->objarray[obno]->value;
+	// Get the value of the object
+	int obj_counter = ZGT_Sh->objarray[obno]->value;
 
-	// TxId Txtype Operation ObId:Obvalue:optime LockType Status TxStatus
-	// WriteLock
+	// FORMAT : TxId Txtype Operation ObId:Obvalue:optime LockType Status TxStatus
+	
+	// If lockmode is W, INCREMENT object value
 	if(lockmode == 'W')   
 	{
-		ZGT_Sh->objarray[obno]->value = values + 1;  
+		ZGT_Sh->objarray[obno]->value = obj_counter + 1;  
 		fprintf(ZGT_Sh->logfile, "T%ld\t\t\t\t\tWriteTx\t\t\t%ld:%d:%d\t\t\tWriteLock\t\t\tGranted\t\t\t %c\n", this->tid, obno, ZGT_Sh->objarray[obno]->value, ZGT_Sh->optime[tid], this->status);
 		fflush(ZGT_Sh->logfile);
 	}
 
 	// ReadLock
+	// If lockmode is R, DECREMENT the object value
 	else  
 	{
-		ZGT_Sh->objarray[obno]->value=values - 1;
+		ZGT_Sh->objarray[obno]->value= obj_counter - 1;
 		fprintf(ZGT_Sh->logfile, "T%ld\t\t\t\t\tReadTx\t\t\t %ld:%d:%d \t\t\t ReadLock\t\t\t Granted\t\t\t %c\n", this->tid, obno, ZGT_Sh->objarray[obno]->value, ZGT_Sh->optime[tid], this->status);
 		fflush(ZGT_Sh->logfile);
 	}
